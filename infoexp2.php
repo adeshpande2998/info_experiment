@@ -83,20 +83,26 @@ if (!$num_q) {
 $qn = empty($_POST['qn']) ? 0 : $_POST['qn'];
 // store the data from the last question answered
 $chosen_act = 0;
+$n_empty = 0;
 if ($qn>0) {
    $result = mysql_query("SELECT * FROM responses WHERE user_id=$user_id && qn=$qn LIMIT 1") or die(mysql_error());
    $rdata = mysql_fetch_array($result);
    // if the data has not already been submitted to the database, store it
    if (empty($rdata['t_submit'])) {
       // make sure there is a response, and store it
-      $chosen_act = $_POST["chosen_act"];
-      $n_empty = empty($chosen_act) + empty($_POST["true_state"]);
+      $chosen_act = empty($_POST["chosen_act"]) ? 0 : $_POST["chosen_act"];
+      if ($rdata['qid'] < 900) {
+         $n_empty = empty($chosen_act);
+      } else {
+         $n_empty = 0;
+      }
       for ($j=1; $j<=10; $j++) {
          $n_empty = $n_empty + !isset($_POST["alt".$j."_choice"]);
       }
       if (!$n_empty) {
-         $result = mysql_query("UPDATE responses SET chosen_act='$chosen_act' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());       
-         $result = mysql_query("UPDATE responses SET true_state='".$_POST["true_state"]."' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         if ($rdata['qid'] < 900) {
+            $result = mysql_query("UPDATE responses SET chosen_act='$chosen_act' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         }
          // store the radio buttons if they are there
          for ($j=1; $j<=10; $j++) {
             $result = mysql_query("UPDATE responses SET alt".$j."_choice ='".$_POST["alt".$j."_choice"]."' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());

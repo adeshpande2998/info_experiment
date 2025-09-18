@@ -25,18 +25,26 @@ if ($rdata['qid']<900) {
    }
    echo "</ul>\n";
    // determine the true state of the world
-   $true_state = 0;
-   $my_rand = mt_rand(0,1000)/1000;
-   $cum_prob = 0;
-   for ($i=1; $i <= 13; $i++) {
-      $prob = $qdata["p$i"];
-      if ($prob>0.0) {
-         $cum_prob += $prob;
-         // echo "true_state: $true_state;  my_rand: $my_rand; cum_prob: $cum_prob<br />\n";
-         if (!$true_state && $my_rand <= $cum_prob) {
-            $true_state = $i;
+   $true_state = intval($rdata['true_state']);
+   if (!$true_state) {
+      $my_rand = mt_rand(0,1000)/1000;
+      $cum_prob = 0;
+      $last_state = 0;
+      for ($i=1; $i <= 13; $i++) {
+         $prob = $qdata["p$i"];
+         if ($prob>0.0) {
+            $cum_prob += $prob;
+            $last_state = $i;
+            if (!$true_state && $my_rand <= $cum_prob) {
+               $true_state = $i;
+            }
          }
       }
+      if (!$true_state) {
+         $true_state = $last_state;
+      }
+      mysql_query("UPDATE responses SET true_state='$true_state' WHERE user_id=$id && qn=$qn") or die(mysql_error());
+      $rdata['true_state'] = $true_state;
    }
 
    // populate the array of dots
@@ -69,8 +77,6 @@ if ($rdata['qid']<900) {
    for ($j=1; $j<=10; $j++) {
       echo "<input type='hidden' name='alt".$j."_choice' value='NULL' />\n";
    }
-
-   echo "<input type='hidden' name='true_state' value='". $true_state ."' />\n";
    echo "<input type='hidden' name='qn' value='". $qn ."' />\n";
    echo "<input type='hidden' name='t_load' id='t_load' value='' />\n";
    echo "<input type='hidden' name='t_submit' id='t_submit' value='' />\n";
@@ -101,8 +107,18 @@ if ($rdata['qid']<900) {
          "<td><input type='button' onclick='javaScript:autocomplete1()' value='Auto-complete Right' /></td></tr>\n";
       echo "</table>\n";
 
-   echo "<input type='hidden' name='chosen_act' value='". mt_rand(1,10) ."' />\n";
-   echo "<input type='hidden' name='true_state' value='". mt_rand(1,10) ."' />\n";
+   $chosen_line = intval($rdata['chosen_act']);
+   if (!$chosen_line) {
+      $chosen_line = mt_rand(1,10);
+      mysql_query("UPDATE responses SET chosen_act='$chosen_line' WHERE user_id=$id && qn=$qn") or die(mysql_error());
+      $rdata['chosen_act'] = $chosen_line;
+   }
+   $true_state = intval($rdata['true_state']);
+   if (!$true_state) {
+      $true_state = mt_rand(1,10);
+      mysql_query("UPDATE responses SET true_state='$true_state' WHERE user_id=$id && qn=$qn") or die(mysql_error());
+      $rdata['true_state'] = $true_state;
+   }
    echo "<input type='hidden' name='qn' value='". $qn ."' />\n";
    echo "<input type='hidden' name='t_load' id='t_load' value='' />\n";
    echo "<input type='hidden' name='t_submit' id='t_submit' value='' />\n";
@@ -194,8 +210,18 @@ if ($rdata['qid']<900) {
          "<td><input type='button' onclick='javaScript:autocomplete1()' value='Auto-complete Right' /></td></tr>\n";
       echo "</table>\n";
 
-   echo "<input type='hidden' name='chosen_act' value='". mt_rand(1,10) ."' />\n";
-   echo "<input type='hidden' name='true_state' value='". mt_rand(1,10) ."' />\n";
+   $chosen_line = intval($rdata['chosen_act']);
+   if (!$chosen_line) {
+      $chosen_line = mt_rand(1,10);
+      mysql_query("UPDATE responses SET chosen_act='$chosen_line' WHERE user_id=$id && qn=$qn") or die(mysql_error());
+      $rdata['chosen_act'] = $chosen_line;
+   }
+   $true_state = intval($rdata['true_state']);
+   if (!$true_state) {
+      $true_state = mt_rand(1,10);
+      mysql_query("UPDATE responses SET true_state='$true_state' WHERE user_id=$id && qn=$qn") or die(mysql_error());
+      $rdata['true_state'] = $true_state;
+   }
    echo "<input type='hidden' name='qn' value='". $qn ."' />\n";
    echo "<input type='hidden' name='t_load' id='t_load' value='' />\n";
    echo "<input type='hidden' name='t_submit' id='t_submit' value='' />\n";
