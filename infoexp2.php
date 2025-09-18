@@ -38,8 +38,31 @@ $fgmembersite->DBLogin();
 $result = mysql_query("SELECT * FROM fgusers3 WHERE id_user=$user_id") or die(mysql_error());
 $user_data = mysql_fetch_array($result);
 
+// collect and sanitize incoming POST data
+$post_data = $_POST;
+$myreset = isset($post_data['MYRESET']) ? intval($post_data['MYRESET']) : 0;
+$qn_posted = isset($post_data['qn']) ? intval($post_data['qn']) : 0;
+$chosen_act_posted = isset($post_data['chosen_act']) ? intval($post_data['chosen_act']) : 0;
+$true_state_posted = isset($post_data['true_state']) ? intval($post_data['true_state']) : 0;
+$t_load_posted = (isset($post_data['t_load']) && $post_data['t_load'] !== '') ? intval($post_data['t_load']) : null;
+$t_submit_posted = (isset($post_data['t_submit']) && $post_data['t_submit'] !== '') ? intval($post_data['t_submit']) : null;
+$flag_inst_posted = !empty($post_data['flag_inst']) ? 1 : 0;
+$alt_choices = array();
+for ($j = 1; $j <= 10; $j++) {
+   $key = "alt".$j."_choice";
+   if (array_key_exists($key, $post_data)) {
+      $value = $post_data[$key];
+      if ($value === '1' || $value === 1) {
+         $alt_choices[$j] = 1;
+      } elseif ($value === '0' || $value === 0) {
+         $alt_choices[$j] = 0;
+      } elseif ($value === 'NULL' || $value === '' || is_null($value)) {
+         $alt_choices[$j] = 'NULL';
+      }
+   }
+}
+
 // reset if requested
-$myreset = empty($_POST['MYRESET']) ? 0 : $_POST['MYRESET'];
 if ($myreset) {
    $result = mysql_query("DELETE FROM responses WHERE user_id=$user_id") or die(mysql_error());
    $result = mysql_query("UPDATE fgusers3 SET nq=0 WHERE id_user =$user_id") or die(mysql_error());
@@ -80,30 +103,44 @@ if (!$num_q) {
 }
 
 // get the last question the user answered
-$qn = empty($_POST['qn']) ? 0 : $_POST['qn'];
+$qn = $qn_posted;
 // store the data from the last question answered
 $chosen_act = 0;
+$n_empty = 0;
 if ($qn>0) {
    $result = mysql_query("SELECT * FROM responses WHERE user_id=$user_id && qn=$qn LIMIT 1") or die(mysql_error());
    $rdata = mysql_fetch_array($result);
    // if the data has not already been submitted to the database, store it
    if (empty($rdata['t_submit'])) {
       // make sure there is a response, and store it
-      $chosen_act = $_POST["chosen_act"];
-      $n_empty = empty($chosen_act) + empty($_POST["true_state"]);
+      $chosen_act = $chosen_act_posted;
+      $true_state = $true_state_posted;
+      $n_empty = empty($chosen_act) + empty($true_state);
       for ($j=1; $j<=10; $j++) {
-         $n_empty = $n_empty + !isset($_POST["alt".$j."_choice"]);
+         $n_empty = $n_empty + !array_key_exists($j, $alt_choices);
       }
       if (!$n_empty) {
-         $result = mysql_query("UPDATE responses SET chosen_act='$chosen_act' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());       
-         $result = mysql_query("UPDATE responses SET true_state='".$_POST["true_state"]."' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         $result = mysql_query("UPDATE responses SET chosen_act=".intval($chosen_act)." WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         $result = mysql_query("UPDATE responses SET true_state=".intval($true_state)." WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
          // store the radio buttons if they are there
          for ($j=1; $j<=10; $j++) {
-            $result = mysql_query("UPDATE responses SET alt".$j."_choice ='".$_POST["alt".$j."_choice"]."' WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+            if (array_key_exists($j, $alt_choices)) {
+               $choice_value = $alt_choices[$j];
+               if ($choice_value === 'NULL') {
+                  $query = "UPDATE responses SET alt".$j."_choice = 'NULL' WHERE user_id=$user_id && qn=$qn";
+               } else {
+                  $query = "UPDATE responses SET alt".$j."_choice = ".intval($choice_value)." WHERE user_id=$user_id && qn=$qn";
+               }
+               $result = mysql_query($query) or die(mysql_error());
+            }
          }
          // store the load and submit times last, after everything else has been submitted successfully
-         $result = mysql_query("UPDATE responses SET t_load=COALESCE(t_load, ".$_POST['t_load'].") WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
-         $result = mysql_query("UPDATE responses SET t_submit=COALESCE(t_submit, ".$_POST['t_submit'].") WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         if (!is_null($t_load_posted)) {
+            $result = mysql_query("UPDATE responses SET t_load=COALESCE(t_load, ".$t_load_posted.") WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         }
+         if (!is_null($t_submit_posted)) {
+            $result = mysql_query("UPDATE responses SET t_submit=COALESCE(t_submit, ".$t_submit_posted.") WHERE user_id=$user_id && qn=$qn") or die(mysql_error());
+         }
          // if we are at the end of the block, flag that the instructions for the next question have not yet been read
          $result = mysql_query("SELECT * FROM responses WHERE user_id=$user_id && qn=".($qn+1)." LIMIT 1") or die(mysql_error());
          $rdata_next = mysql_fetch_array($result);
@@ -116,12 +153,12 @@ if ($qn>0) {
 
 
 // flag if the user has read the instructions for this question
-if ($_POST["flag_inst"]) {
+if ($flag_inst_posted) {
   $result = mysql_query("UPDATE fgusers3 SET flag_inst='1' WHERE id_user=$user_id") or die(mysql_error());
 }
 
 // store the number of questions answered
-$qn = $myreset ? 0 : max(0, $user_data['nq']+(!$n_empty)==$qn ? $user_data['nq']+(!$n_empty) : $user_data['nq']);
+$qn = $myreset ? 0 : max(0, ($user_data['nq']+(!$n_empty))==$qn_posted ? $user_data['nq']+(!$n_empty) : $user_data['nq']);
 $result = mysql_query("UPDATE fgusers3 SET nq=$qn WHERE id_user=$user_id") or die(mysql_error());
 // advance to the next question
 $qn = $qn+1;
@@ -134,7 +171,7 @@ if ($qn<=$num_q) {
    if (!$flag_inst) {
       disp_iquestion($user_id, $qn);
    } else {
-      if ($n_empty && !$_POST["flag_inst"]) {
+      if ($n_empty && !$flag_inst_posted) {
          echo "<p><b><font color='red'>Please select an option.</font></b></p>\n";
       }
       disp_question($user_id, $qn);
